@@ -100,6 +100,7 @@ std::map<rfc4251::string, string> confirmed_pubkeys;
 bool debug{false};
 bool all_confirmed{false};
 string saf_name;
+string listen_path;
 fs::path path  = getenv("SSH_AUTH_SOCK");
 mutex fd_fork_mutex;
 
@@ -164,6 +165,9 @@ int make_upstream_agent_conn () {
 int make_listen_sock () {
 	int sock;
 	struct sockaddr_un addr;
+
+	// If we are passed the socket on stdin, inetd-style
+	if (listen_path == "-") return STDIN_FILENO;
 	
 	{
 		lock_guard<mutex> lock{fd_fork_mutex};
@@ -176,11 +180,13 @@ int make_listen_sock () {
 		throw system_error(errno, system_category(), "fcntl");
 
 	addr.sun_family = AF_UNIX;
+
+	if (listen_path.empty()) listen_path = path.native();
 	
-	if (path.native().length() >= sizeof(addr.sun_path))
+	if (listen_path.length() >= sizeof(addr.sun_path))
 		throw length_error("path for listen socket too long");
 
-	strcpy(addr.sun_path, path.c_str());
+	strcpy(addr.sun_path, listen_path.c_str());
 
 	if (bind(sock, reinterpret_cast<struct sockaddr const *>(&addr), sizeof(addr)))
 		throw system_error(errno, system_category(), "bind");
@@ -204,6 +210,7 @@ void parse_cmdline (int const argc, char const * const * const argv) {
 		("key,k",			po::value(&allowed_b64),	"key specified by base64-encoded pubkey")
 		("key-confirmed,K",		po::value(&confirmed_b64),	"key specified by base64-encoded pubkey, with confirmation")
 		("name,n",			po::value(&saf_name),		"name for this instance of ssh-agent-filter, for confirmation puposes")
+		("socket,s",			po::value(&listen_path),		"path to the listening socket, for this instance of ssh-agent-filter")
 		("version,V",			"print version information")
 		;
 	po::variables_map config;
