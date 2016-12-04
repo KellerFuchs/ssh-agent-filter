@@ -100,7 +100,7 @@ std::map<rfc4251::string, string> confirmed_pubkeys;
 bool debug{false};
 bool all_confirmed{false};
 string saf_name;
-fs::path path;
+fs::path path  = getenv("SSH_AUTH_SOCK");
 mutex fd_fork_mutex;
 
 
@@ -138,7 +138,7 @@ int make_upstream_agent_conn () {
 	int sock;
 	struct sockaddr_un addr;
 
-	if (!(path = getenv("SSH_AUTH_SOCK")))
+	if (!path)
 		throw invalid_argument("no $SSH_AUTH_SOCK");
 
 	{
